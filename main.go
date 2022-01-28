@@ -118,14 +118,7 @@ func main() {
                         "Principal": "*",
                         "Effect": "Allow",
                         "Sid": ""
-                    },
-                    {
-                        "Action": "lambda:InvokeFunction",
-                        "Resource": "*",
-                        "Principal": "*",
-                        "Effect": "Allow",
-                        "Sid": ""
-                      }
+                    }
                   ]
                 }`),
 			},
@@ -189,7 +182,7 @@ func main() {
 				Type:                  pulumi.String("AWS_PROXY"),
 				Uri:                   function.InvokeArn,
 			},
-			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, method}),
+			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, authFunction, method}),
 		)
 		if err != nil {
 			return err
@@ -202,9 +195,9 @@ func main() {
 				Action:    pulumi.String("lambda:InvokeFunction"),
 				Function:  authFunction.Name,
 				Principal: pulumi.String("apigateway.amazonaws.com"),
-				SourceArn: pulumi.Sprintf("arn:aws:execute-api:%s:%s:%s/*/*/*", region.Name, account.AccountId, gateway.ID()),
+				SourceArn: pulumi.Sprintf("arn:aws:execute-api:%s:%s:%s/*/*", region.Name, account.AccountId, gateway.ID()),
 			},
-			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, integration}),
+			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, authFunction, function, authFunction, integration}),
 		)
 		if err != nil {
 			return err
@@ -216,7 +209,7 @@ func main() {
 				Principal: pulumi.String("apigateway.amazonaws.com"),
 				SourceArn: pulumi.Sprintf("arn:aws:execute-api:%s:%s:%s/*/*/*", region.Name, account.AccountId, gateway.ID()),
 			},
-			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, integration}),
+			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, authFunction, integration}),
 		)
 		if err != nil {
 			return err
