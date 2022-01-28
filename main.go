@@ -198,7 +198,79 @@ func main() {
 		if err != nil {
 			return err
 		}
-
+		////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// Setup CORS configuration for API Gateway
+		// Mimic of https://github.com/mewa/terraform-aws-apigateway-cors
+		// INPUTS:
+		// - aws_api_gateway_rest_api == gateway
+		// - aws_api_gateway_resource == apiresource
+		// methods = ["GET", "POST", ...]
+		corsmethod, err := apigateway.NewMethod(ctx, "CORSMethod",
+			&apigateway.MethodArgs{
+				HttpMethod:    pulumi.String("OPTIONS"),
+				Authorization: pulumi.String("NONE"),
+				RestApi:       gateway.ID(),
+				ResourceId:    apiresource.ID(),
+			},
+			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function}),
+		)
+		if err != nil {
+			return err
+		}
+		corsIntegration, err := apigateway.NewIntegration(ctx, "CORSIntegration",
+			&apigateway.IntegrationArgs{
+				HttpMethod:            pulumi.String("OPTIONS"),
+				IntegrationHttpMethod: pulumi.String("POST"),
+				ResourceId:            apiresource.ID(),
+				RestApi:               gateway.ID(),
+				Type:                  pulumi.String("MOCK"),
+				RequestTemplates: pulumi.StringMap{
+					"application/json": pulumi.String("{ \"statusCode\": 200 }"),
+				},
+			},
+			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, authFunction, method, corsmethod}),
+		)
+		if err != nil {
+			return err
+		}
+		corsMethodResp, err := apigateway.NewMethodResponse(ctx, "response_method",
+			&apigateway.MethodResponseArgs{
+				HttpMethod: pulumi.Sprintf("%s", corsmethod.HttpMethod),
+				ResponseModels: pulumi.StringMap{
+					"application/json": pulumi.String("Empty"),
+				},
+				ResponseParameters: pulumi.BoolMap{
+					"method.response.header.Access-Control-Allow-Headers": pulumi.Bool(true),
+					"method.response.header.Access-Control-Allow-Methods": pulumi.Bool(true),
+					"method.response.header.Access-Control-Allow-Origin":  pulumi.Bool(true),
+				},
+				ResourceId: apiresource.ID(),
+				RestApi:    gateway.ID(),
+				StatusCode: pulumi.String("200"),
+			},
+			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, authFunction, method, corsIntegration, corsmethod}),
+		)
+		if err != nil {
+			return err
+		}
+		corsIntegResp, err := apigateway.NewIntegrationResponse(ctx, "response_integration",
+			&apigateway.IntegrationResponseArgs{
+				HttpMethod: pulumi.Sprintf("%s", corsmethod.HttpMethod),
+				RestApi:    gateway.ID(),
+				ResourceId: pulumi.Sprintf("%s", corsmethod.ResourceId),
+				// ResponseParameters: pulumi.StringMap{
+				// 	"method.response.header.Access-Control-Allow-Headers": pulumi.String("integration.response.header.Origin"),
+				// 	// "method.response.header.Access-Control-Allow-Methods": pulumi.String("HEAD,GET,POST,PUT,PATCH,DELETE"),
+				// 	// "method.response.header.Access-Control-Allow-Origin": pulumi.String("*"),
+				// },
+				StatusCode: pulumi.Sprintf("%s", corsMethodResp.StatusCode),
+			},
+			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, authFunction, method, corsMethodResp, corsIntegration, corsmethod}),
+		)
+		if err != nil {
+			return err
+		}
+		////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Add a resource based policy to the Lambda function.
 		// This is the final step and allows AWS API Gateway to communicate with the AWS Lambda function
 		authpermission, err := lambda.NewPermission(ctx, "AuthAPIPermission",
@@ -234,7 +306,7 @@ func main() {
 				StageDescription: pulumi.String("Production"),
 				StageName:        pulumi.String("prod"),
 			},
-			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, integration, permission, authpermission, method}),
+			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, integration, permission, authpermission, method, corsMethodResp, corsIntegration, corsmethod, corsIntegResp}),
 		)
 		if err != nil {
 			return err

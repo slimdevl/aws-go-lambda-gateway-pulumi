@@ -1,4 +1,4 @@
-# AWS Golang Lambda With API Gateway and Authorizer
+# AWS Golang Lambda With API Gateway and Authorizer (and CORS)
 
 This example creates a lambda that does a simple `ToUpper` on the path input of an API request and returns it.
 
@@ -126,9 +126,22 @@ After cloning this repo, run these commands from the working directory:
 	HELLOWORLD%
     ```
 
-6. From there, feel free to experiment. Simply making edits, rebuilding your handler, and running `pulumi up` will update your lambda.
+6. Testing CORS Preflight
 
-7. Afterwards, destroy your stack and remove it:
+    ```bash
+    curl \
+     -H "Origin: http://example.com"  \
+     -H "Access-Control-Request-Method: GET" \
+     -H "Access-Control-Request-Headers: X-Requested-With" \
+     -X OPTIONS \
+     --verbose \
+     -H "authorizationToken:allow" \
+     https://<gateway-id>.execute-api.us-east-2.amazonaws.com/prod/hello
+     ```
+
+7. From there, feel free to experiment. Simply making edits, rebuilding your handler, and running `pulumi up` will update your lambda.
+
+8. Afterwards, destroy your stack and remove it:
 
 	```bash
 	pulumi destroy --yes
