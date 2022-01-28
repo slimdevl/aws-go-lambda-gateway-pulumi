@@ -55,7 +55,8 @@ func main() {
                 }]
             }`),
 			},
-			pulumi.DependsOn([]pulumi.Resource{role}))
+			pulumi.DependsOn([]pulumi.Resource{role}),
+		)
 		if err != nil {
 			return err
 		}
@@ -78,19 +79,29 @@ func main() {
 		if err != nil {
 			return err
 		}
+		secret, err := apigateway.NewApiKey(ctx, "key", nil)
+		if err != nil {
+			return err
+		}
+		ctx.Export("key", pulumi.Sprintf("%s", secret.Value))
 		// Set arguments for constructing the function resource.
 		authFuncArgs := &lambda.FunctionArgs{
 			Handler: pulumi.String("handler"),
 			Role:    role.Arn,
 			Runtime: pulumi.String("go1.x"),
 			Code:    pulumi.NewFileArchive("./authorizer.zip"),
+			Environment: &lambda.FunctionEnvironmentArgs{
+				Variables: pulumi.StringMap{
+					"ACCESS_TOKEN": secret.Value,
+				},
+			},
 		}
 		// Create the lambda using the args.
 		authFunction, err := lambda.NewFunction(
 			ctx,
 			"authFunction",
 			authFuncArgs,
-			pulumi.DependsOn([]pulumi.Resource{logPolicy}),
+			pulumi.DependsOn([]pulumi.Resource{logPolicy, secret}),
 		)
 		if err != nil {
 			return err

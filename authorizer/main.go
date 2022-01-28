@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -36,6 +37,13 @@ func generatePolicy(principalId, effect, resource string) events.APIGatewayCusto
 	return authResponse
 }
 
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
 func handleRequest(ctx context.Context, event events.APIGatewayCustomAuthorizerRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
 	fmt.Println("TOKEN", event.AuthorizationToken)
 	token := event.AuthorizationToken
@@ -47,6 +55,10 @@ func handleRequest(ctx context.Context, event events.APIGatewayCustomAuthorizerR
 	case "unauthorized":
 		return events.APIGatewayCustomAuthorizerResponse{}, errors.New("Unauthorized") // Return a 401 Unauthorized response
 	default:
+		secret := getEnv("ACCESS_TOKEN", "fail")
+		if secret != "fail" && token == secret {
+			return generatePolicy("user", "Allow", event.MethodArn), nil
+		}
 		return events.APIGatewayCustomAuthorizerResponse{}, errors.New("Error: Invalid token")
 	}
 }

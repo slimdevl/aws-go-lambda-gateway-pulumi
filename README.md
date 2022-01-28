@@ -120,6 +120,12 @@ After cloning this repo, run these commands from the working directory:
 	HELLOWORLD%
 	```
 
+    ```bash
+    SECRET=$(pulumi stack output --show-secrets key)
+    curl https://<gateway-id>.execute-api.us-east-1.amazonaws.com/prod/message -H "authorizationToken: ${SECRET}"
+	HELLOWORLD%
+    ```
+
 6. From there, feel free to experiment. Simply making edits, rebuilding your handler, and running `pulumi up` will update your lambda.
 
 7. Afterwards, destroy your stack and remove it:
