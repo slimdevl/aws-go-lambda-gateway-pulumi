@@ -1,4 +1,4 @@
-# AWS Golang Lambda With API Gateway
+# AWS Golang Lambda With API Gateway and Authorizer
 
 This example creates a lambda that does a simple `ToUpper` on the path input of an API request and returns it.
 
@@ -23,18 +23,18 @@ After cloning this repo, run these commands from the working directory:
 		```bash
 		make build
 		```
-		
+
 	- For developers on Windows:
-		
+
 		- Get the `build-lambda-zip` tool:
-			
+
 			```bash
 			set GO111MODULE=on
 			go.exe get -u github.com/aws/aws-lambda-go/cmd/build-lambda-zip
 			```
-		
+
 		- Use the tool from your GOPATH:
-				
+
 			```bash
 			set GOOS=linux
 			set GOARCH=amd64
@@ -42,7 +42,7 @@ After cloning this repo, run these commands from the working directory:
 			go build -o handler\handler handler\handler.go
 			%USERPROFILE%\Go\bin\build-lambda-zip.exe -o handler\handler.zip handler\handler
 			```
-		
+
 
 2. Create a new Pulumi stack, which is an isolated deployment target for this example:
 
@@ -52,57 +52,72 @@ After cloning this repo, run these commands from the working directory:
 
 3. Set the required configuration variables for this program:
 	```bash
-	$ pulumi config set aws:region us-west-2
+	$ pulumi config set aws:region us-east-1
 	```
 
 4. Execute the Pulumi program to create our lambda:
 
 	```bash
-	$ pulumi up                              
+	$ pulumi up
 	Previewing update (dev):
-		Type                           Name               Plan       
-	+   pulumi:pulumi:Stack            go-lambda-dev      create     
-	+   ├─ aws:apigateway:RestApi      UpperCaseGateway   create     
-	+   ├─ aws:iam:Role                task-exec-role     create     
-	+   ├─ aws:apigateway:Resource     UpperAPI           create     
-	+   ├─ aws:iam:RolePolicy          lambda-log-policy  create     
-	+   ├─ aws:apigateway:Method       AnyMethod          create     
-	+   ├─ aws:lambda:Function         basicLambda        create     
-	+   ├─ aws:lambda:Permission       APIPermission      create     
-	+   ├─ aws:apigateway:Integration  LambdaIntegration  create     
-	+   └─ aws:apigateway:Deployment   APIDeployment      create     
-	
-	Resources:
-		+ 10 to create
+         Type                           Name                          Plan
+     +   pulumi:pulumi:Stack            go-lambda-gateway-dev-lambda  create
+     +   ├─ aws:iam:Role                task-exec-role                create
+     +   ├─ aws:apigateway:RestApi      UpperCaseGateway              create
+     +   ├─ aws:iam:RolePolicy          lambda-log-policy             create
+     +   ├─ aws:apigateway:Resource     UpperAPI                      create
+     +   ├─ aws:lambda:Function         basicLambda                   create
+     +   ├─ aws:lambda:Function         authFunction                  create
+     +   ├─ aws:apigateway:Authorizer   authorizer                    create
+     +   ├─ aws:apigateway:Method       AnyMethod                     create
+     +   ├─ aws:apigateway:Integration  LambdaIntegration             create
+     +   ├─ aws:lambda:Permission       APIPermission                 create
+     +   ├─ aws:lambda:Permission       AuthAPIPermission             create
+     +   └─ aws:apigateway:Deployment   APIDeployment                 create
+
+    Resources:
+        + 13 to create
 
 	Do you want to perform this update? yes
 	Updating (dev):
-		Type                           Name               Status      
-	+   pulumi:pulumi:Stack            go-lambda-dev      created     
-	+   ├─ aws:apigateway:RestApi      UpperCaseGateway   created     
-	+   ├─ aws:iam:Role                task-exec-role     created     
-	+   ├─ aws:apigateway:Resource     UpperAPI           created     
-	+   ├─ aws:iam:RolePolicy          lambda-log-policy  created     
-	+   ├─ aws:apigateway:Method       AnyMethod          created     
-	+   ├─ aws:lambda:Function         basicLambda        created     
-	+   ├─ aws:apigateway:Integration  LambdaIntegration  created     
-	+   ├─ aws:lambda:Permission       APIPermission      created     
-	+   └─ aws:apigateway:Deployment   APIDeployment      created     
-	
-	Outputs:
-		invocation URL: "https://<gateway-id>.execute-api.us-west-2.amazonaws.com/prod/{message}"
+         Type                           Name                          Status
+     +   pulumi:pulumi:Stack            go-lambda-gateway-dev-lambda  created
+     +   ├─ aws:iam:Role                task-exec-role                created
+     +   ├─ aws:apigateway:RestApi      UpperCaseGateway              created
+     +   ├─ aws:apigateway:Resource     UpperAPI                      created
+     +   ├─ aws:iam:RolePolicy          lambda-log-policy             created
+     +   ├─ aws:lambda:Function         authFunction                  created
+     +   ├─ aws:lambda:Function         basicLambda                   created
+     +   ├─ aws:apigateway:Authorizer   authorizer                    created
+     +   ├─ aws:apigateway:Method       AnyMethod                     created
+     +   ├─ aws:apigateway:Integration  LambdaIntegration             created
+     +   ├─ aws:lambda:Permission       APIPermission                 created
+     +   ├─ aws:lambda:Permission       AuthAPIPermission             created
+     +   └─ aws:apigateway:Deployment   APIDeployment                 created
 
-	Resources:
-		+ 10 created
+    Outputs:
+        invocation URL: "https://e3tv36udd3.execute-api.us-east-1.amazonaws.com/prod/{message}"
 
-	Duration: 29s
+    Resources:
+        + 13 created
+
+    Duration: 28s
 	```
 
 5. Call our lambda function from the cli:
+    ```bash
+    $ curl https://<gateway-id>.execute-api.us-east-1.amazonaws.com/prod/helloworld
+    {"message":"Unauthorized"}
+    ```
+
+    ```bash
+	curl https://<gateway-id>.execute-api.us-east-1.amazonaws.com/prod/helloworld -H "authorizationToken:deny"
+    {"Message":"User is not authorized to access this resource with an explicit deny"}
+	```
 
 	```bash
-	curl https://<gateway-id>.execute-api.us-west-2.amazonaws.com/prod/helloworld   
-	HELLOWORLD% 
+	curl https://<gateway-id>.execute-api.us-east-1.amazonaws.com/prod/helloworld -H "authorizationToken: allow"
+	HELLOWORLD%
 	```
 
 6. From there, feel free to experiment. Simply making edits, rebuilding your handler, and running `pulumi up` will update your lambda.
