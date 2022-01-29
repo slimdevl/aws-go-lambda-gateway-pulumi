@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -44,10 +46,61 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func handleRequest(ctx context.Context, event events.APIGatewayCustomAuthorizerRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
-	fmt.Println("TOKEN", event.AuthorizationToken)
-	token := event.AuthorizationToken
-	switch strings.ToLower(token) {
+func getHeaders(event events.APIGatewayCustomAuthorizerRequestTypeRequest) *http.Header {
+	headers := &http.Header{}
+	for k, v := range event.Headers {
+		headers.Add(k, v)
+	}
+
+	return headers
+}
+
+var (
+	ErrInvalidToken = errors.New("Invalid token")
+	ErrUnauthorized = errors.New("Unauthorized")
+)
+
+const (
+	DefaultTokenType = ""
+	APITokenType     = "api.token"
+)
+
+func IsValidTokenType(name string) bool {
+	if _, ok := TokenTypes[strings.ToLower(name)]; ok {
+		return true
+	}
+
+	return false
+}
+
+var TokenTypes = map[string]struct{}{
+	DefaultTokenType: {},
+	APITokenType:     {},
+}
+
+func handleRequest(ctx context.Context, event events.APIGatewayCustomAuthorizerRequestTypeRequest) (events.APIGatewayCustomAuthorizerResponse, error) {
+	headers := getHeaders(event)
+	parts := strings.Split(headers.Get("Authorization"), " ")
+	if len(parts) != 2 {
+		return events.APIGatewayCustomAuthorizerResponse{}, ErrUnauthorized
+	}
+	if len(parts) != 2 {
+		return events.APIGatewayCustomAuthorizerResponse{}, ErrUnauthorized
+	}
+	rawData, _ := base64.StdEncoding.DecodeString(parts[1])
+	authParts := strings.SplitN(string(rawData), ":", 2)
+	if len(authParts) != 2 {
+		return events.APIGatewayCustomAuthorizerResponse{}, ErrUnauthorized
+	}
+	authType := authParts[0]
+	authToken := authParts[1]
+	fmt.Println("authType", authType)
+	fmt.Println("authToken", authToken)
+	if !IsValidTokenType(authParts[0]) {
+		return events.APIGatewayCustomAuthorizerResponse{}, ErrUnauthorized
+	}
+
+	switch strings.ToLower(authToken) {
 	case "allow":
 		return generatePolicy("user", "Allow", event.MethodArn), nil
 	case "deny":
@@ -56,10 +109,10 @@ func handleRequest(ctx context.Context, event events.APIGatewayCustomAuthorizerR
 		return events.APIGatewayCustomAuthorizerResponse{}, errors.New("Unauthorized") // Return a 401 Unauthorized response
 	default:
 		secret := getEnv("ACCESS_TOKEN", "fail")
-		if secret != "fail" && token == secret {
+		if secret != "fail" && authToken == secret {
 			return generatePolicy("user", "Allow", event.MethodArn), nil
 		}
-		return events.APIGatewayCustomAuthorizerResponse{}, errors.New("Error: Invalid token")
+		return events.APIGatewayCustomAuthorizerResponse{}, ErrInvalidToken
 	}
 }
 

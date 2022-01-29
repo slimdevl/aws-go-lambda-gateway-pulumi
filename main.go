@@ -157,10 +157,10 @@ func main() {
 			&apigateway.AuthorizerArgs{
 				AuthorizerUri:                authFunction.InvokeArn,
 				AuthorizerResultTtlInSeconds: pulumi.Int(0),
-				IdentitySource:               pulumi.String("method.request.header.authorizationToken"),
+				IdentitySource:               pulumi.String("method.request.header.Authorization"),
 				Name:                         pulumi.String("authorizer"),
 				RestApi:                      gateway.ID(),
-				Type:                         pulumi.String("TOKEN"),
+				Type:                         pulumi.String("REQUEST"),
 			},
 			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, function, authFunction}),
 		)
@@ -170,11 +170,12 @@ func main() {
 		// Add a method to the API Gateway.
 		method, err := apigateway.NewMethod(ctx, "AnyMethod",
 			&apigateway.MethodArgs{
-				HttpMethod:    pulumi.String("ANY"),
-				Authorization: pulumi.String("CUSTOM"),
-				RestApi:       gateway.ID(),
-				ResourceId:    apiresource.ID(),
-				AuthorizerId:  authorizer.ID(),
+				HttpMethod:     pulumi.String("ANY"),
+				Authorization:  pulumi.String("CUSTOM"),
+				ApiKeyRequired: pulumi.BoolPtr(false),
+				RestApi:        gateway.ID(),
+				ResourceId:     apiresource.ID(),
+				AuthorizerId:   authorizer.ID(),
 			},
 			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function}),
 		)
