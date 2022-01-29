@@ -236,9 +236,9 @@ func main() {
 		corsMethodResp, err := apigateway.NewMethodResponse(ctx, "response_method",
 			&apigateway.MethodResponseArgs{
 				HttpMethod: pulumi.Sprintf("%s", corsmethod.HttpMethod),
-				ResponseModels: pulumi.StringMap{
-					"application/json": pulumi.String("Empty"),
-				},
+				// ResponseModels: pulumi.StringMap{
+				// 	"application/json": pulumi.String("Empty"),
+				// },
 				ResponseParameters: pulumi.BoolMap{
 					"method.response.header.Access-Control-Allow-Headers": pulumi.Bool(true),
 					"method.response.header.Access-Control-Allow-Methods": pulumi.Bool(true),
@@ -258,11 +258,11 @@ func main() {
 				HttpMethod: pulumi.Sprintf("%s", corsmethod.HttpMethod),
 				RestApi:    gateway.ID(),
 				ResourceId: pulumi.Sprintf("%s", corsmethod.ResourceId),
-				// ResponseParameters: pulumi.StringMap{
-				// 	"method.response.header.Access-Control-Allow-Headers": pulumi.String("integration.response.header.Origin"),
-				// 	// "method.response.header.Access-Control-Allow-Methods": pulumi.String("HEAD,GET,POST,PUT,PATCH,DELETE"),
-				// 	// "method.response.header.Access-Control-Allow-Origin": pulumi.String("*"),
-				// },
+				ResponseParameters: pulumi.StringMap{
+					"method.response.header.Access-Control-Allow-Headers": pulumi.String("'Origin,Accept,Authorization,Content-Type,User-Agent,X-Api-Key,Referer,Accept-Encoding,Accept-Language,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site'"),
+					"method.response.header.Access-Control-Allow-Methods": pulumi.String("'OPTIONS,DELETE,GET,HEAD,PATCH,POST,PUT'"),
+					"method.response.header.Access-Control-Allow-Origin":  pulumi.String("'*'"),
+				},
 				StatusCode: pulumi.Sprintf("%s", corsMethodResp.StatusCode),
 			},
 			pulumi.DependsOn([]pulumi.Resource{gateway, apiresource, authorizer, function, authFunction, method, corsMethodResp, corsIntegration, corsmethod}),
